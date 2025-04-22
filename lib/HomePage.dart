@@ -9,6 +9,8 @@ class Homepage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final productsAsync = ref.watch(productListProvider);
+    final searchQuery = ref.watch(searchQueryProvider);
+    final filteredCount = productsAsync.asData?.value.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -26,6 +28,22 @@ class Homepage extends ConsumerWidget {
       body: Column(
         children: [
           _buildSearchBar(context, ref),
+
+          /// ✨ Centered "Showing X results"
+          if (searchQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: Text(
+                  'Showing $filteredCount result${filteredCount == 1 ? '' : 's'}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+
           Expanded(
             child: productsAsync.when(
               data:
