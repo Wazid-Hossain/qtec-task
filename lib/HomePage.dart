@@ -32,13 +32,13 @@ class Homepage extends ConsumerWidget {
                   (products) => GridView.builder(
                     padding: const EdgeInsets.all(12),
                     itemCount: products.length,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.65,
-                        ),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount:
+                          (MediaQuery.of(context).size.width / 200).floor(),
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.65,
+                    ),
                     itemBuilder:
                         (_, index) => ProductCard(product: products[index]),
                   ),
