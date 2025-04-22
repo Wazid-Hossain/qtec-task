@@ -1,19 +1,21 @@
+// api_services.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:qtec_task/model.dart';
+import 'model.dart';
 
 class ApiService {
-  static const String _baseUrl =
-      'https://fakestoreapi.com/products'; // Replace with your API URL
+  static const String _baseUrl = 'https://fakestoreapi.com/products';
 
-  /// Fetch all products from the API
-  static Future<List<product_model>> fetchProducts() async {
+  static Future<List<ProductModel>> fetchProducts() async {
     try {
-      final response = await http.get(Uri.parse(_baseUrl));
+      final uri = Uri.parse(_baseUrl);
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
-        List<dynamic> data = jsonDecode(response.body);
-        return data.map((json) => product_model.fromJson(json)).toList();
+        final data = jsonDecode(response.body);
+        return (data as List)
+            .map((json) => ProductModel.fromJson(json))
+            .toList();
       } else {
         throw Exception('Failed to load products: ${response.statusCode}');
       }

@@ -1,84 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qtec_task/model.dart';
+import 'package:qtec_task/product%20list/Riverpod%20Providers.dart';
 
-class Homepage extends StatefulWidget {
+class Homepage extends ConsumerWidget {
   const Homepage({super.key});
 
   @override
-  State<Homepage> createState() => _HomepageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final productsAsync = ref.watch(productListProvider);
 
-class _HomepageState extends State<Homepage> {
-  final TextEditingController _searchController = TextEditingController();
-  bool _showFilterIcon = false;
-
-  void _onSearchChanged(String value) {
-    setState(() {
-      _showFilterIcon = value.trim().isNotEmpty;
-    });
-  }
-
-  void _showSortOptions() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder:
-          (context) => Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Sort By',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-                const Divider(),
-                ListTile(
-                  title: const Text('Price - High to Low'),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
-                ListTile(
-                  title: const Text('Price - Low to High'),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
-                ListTile(
-                  title: const Text('Rating'),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
-            ),
-          ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.green,
@@ -92,48 +23,192 @@ class _HomepageState extends State<Homepage> {
           ),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            // Search Input
-            Expanded(
-              child: Container(
-                height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  decoration: const InputDecoration(
-                    icon: Icon(Icons.search, color: Colors.black54),
-                    hintText: 'Search Anything...',
-                    border: InputBorder.none,
+      body: Column(
+        children: [
+          _buildSearchBar(context, ref),
+          Expanded(
+            child: productsAsync.when(
+              data:
+                  (products) => GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: products.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 0.65,
+                        ),
+                    itemBuilder:
+                        (_, index) => ProductCard(product: products[index]),
                   ),
-                ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(child: Text('Error: $err')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(BuildContext context, WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              height: 50,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Consumer(
+                builder: (context, ref, _) {
+                  return TextField(
+                    onChanged: (query) {
+                      ref.read(searchQueryProvider.notifier).state = query;
+                    },
+                    decoration: const InputDecoration(
+                      icon: Icon(Icons.search, color: Colors.black54),
+                      hintText: 'Search Anything...',
+                      border: InputBorder.none,
+                    ),
+                  );
+                },
               ),
             ),
-            const SizedBox(width: 10),
-            // Filter Icon
-            if (_showFilterIcon)
-              GestureDetector(
-                onTap: _showSortOptions,
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.sort, size: 20),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: () => _showSortOptions(context, ref),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.sort, size: 20),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSortOptions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder:
+          (context) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Price - High to Low'),
+                onTap: () {
+                  ref.read(sortTypeProvider.notifier).state =
+                      SortType.highToLow;
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: const Text('Price - Low to High'),
+                onTap: () {
+                  ref.read(sortTypeProvider.notifier).state =
+                      SortType.lowToHigh;
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: const Text('Rating'),
+                onTap: () {
+                  ref.read(sortTypeProvider.notifier).state = SortType.rating;
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+    );
+  }
+}
+
+class ProductCard extends StatefulWidget {
+  final ProductModel product;
+
+  const ProductCard({super.key, required this.product});
+
+  @override
+  State<ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<ProductCard> {
+  bool isFavorite = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: [
+              Expanded(
+                child: Image.network(
+                  widget.product.image ?? '',
+                  fit: BoxFit.contain,
                 ),
               ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                widget.product.title ?? '',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "\$${widget.product.price}",
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.star, color: Colors.orange, size: 16),
+                  Text(
+                    "${widget.product.rating?.rate ?? 0} (${widget.product.rating?.count ?? 0})",
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: () {
+              setState(() => isFavorite = !isFavorite);
+            },
+            child: Icon(
+              isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: isFavorite ? Colors.red : Colors.grey,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

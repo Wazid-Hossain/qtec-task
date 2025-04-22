@@ -1,4 +1,4 @@
-class product_model {
+class ProductModel {
   int? id;
   String? title;
   double? price;
@@ -7,7 +7,7 @@ class product_model {
   String? image;
   Rating? rating;
 
-  product_model({
+  ProductModel({
     this.id,
     this.title,
     this.price,
@@ -17,7 +17,7 @@ class product_model {
     this.rating,
   });
 
-  product_model.fromJson(Map<String, dynamic> json) {
+  ProductModel.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     title = json['title'];
     price = json['price'];
