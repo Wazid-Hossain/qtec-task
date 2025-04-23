@@ -193,14 +193,21 @@ class _HomepageState extends ConsumerState<Homepage> {
   }
 }
 
-class _ProductCard extends StatelessWidget {
+class _ProductCard extends StatefulWidget {
   final ProductModel product;
   const _ProductCard({required this.product});
 
   @override
+  State<_ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<_ProductCard> {
+  bool isFav = false;
+
+  @override
   Widget build(BuildContext context) {
     // decode and re-encode thumbnail
-    final raw = product.thumbnail ?? '';
+    final raw = widget.product.thumbnail ?? '';
     final decoded = raw.isNotEmpty ? Uri.decodeFull(raw) : '';
     final url = decoded.isNotEmpty ? Uri.encodeFull(decoded) : '';
 
@@ -227,8 +234,8 @@ class _ProductCard extends StatelessWidget {
                   ),
             );
 
-    final price = product.price ?? 0;
-    final disc = product.discountPercentage ?? 0;
+    final price = widget.product.price ?? 0;
+    final disc = widget.product.discountPercentage ?? 0;
     final orig = disc > 0 ? price * 100 / (100 - disc) : price;
 
     return Stack(
@@ -245,7 +252,7 @@ class _ProductCard extends StatelessWidget {
               Expanded(child: image),
               const SizedBox(height: 6),
               Text(
-                product.title ?? '',
+                widget.product.title ?? '',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.bold),
@@ -285,11 +292,11 @@ class _ProductCard extends StatelessWidget {
                   const Icon(Icons.star, color: Colors.orange, size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    '${(product.rating ?? 0).toStringAsFixed(1)} (${product.stock ?? 0})',
+                    '${(widget.product.rating ?? 0).toStringAsFixed(1)} (${widget.product.stock ?? 0})',
                   ),
                 ],
               ),
-              if ((product.stock ?? 0) <= 0) ...[
+              if ((widget.product.stock ?? 0) <= 0) ...[
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -315,8 +322,15 @@ class _ProductCard extends StatelessWidget {
           top: 6,
           right: 6,
           child: GestureDetector(
-            onTap: () {},
-            child: const Icon(Icons.favorite_border, color: Colors.grey),
+            onTap: () {
+              setState(() {
+                isFav = !isFav; // toggle
+              });
+            },
+            child: Icon(
+              isFav ? Icons.favorite : Icons.favorite_border,
+              color: isFav ? Colors.red : Colors.grey,
+            ),
           ),
         ),
       ],
