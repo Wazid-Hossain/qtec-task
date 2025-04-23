@@ -1,28 +1,21 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'model.dart';
+import 'package:qtec_task/model.dart';
 
 class ApiService {
-  static const String _baseUrl = 'https://dummyjson.com/products';
+  static const _baseUrl = 'https://dummyjson.com/products';
 
-  static Future<List<ProductModel>> fetchProducts({
-    int limit = 10,
-    int skip = 0,
-  }) async {
-    try {
-      final uri = Uri.parse("$_baseUrl?limit=$limit&skip=$skip");
-      final response = await http.get(uri);
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final products = data['products'] as List;
-        return products.map((json) => ProductModel.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to load products');
-      }
-    } catch (e) {
-      print("API Error: $e");
-      rethrow;
+  /// Fetch *all* products in one go
+  static Future<List<ProductModel>> fetchAll() async {
+    final uri = Uri.parse("$_baseUrl?limit=100");
+    final resp = await http.get(uri);
+    if (resp.statusCode != 200) {
+      throw Exception('Failed to load products (${resp.statusCode})');
     }
+    final data = jsonDecode(resp.body);
+    final list = (data['products'] as List);
+    return list.map((j) => ProductModel.fromJson(j)).toList();
   }
+
+  static fetchProducts() {}
 }

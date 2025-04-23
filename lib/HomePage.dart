@@ -1,294 +1,187 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qtec_task/api services/model.dart';
-import 'package:qtec_task/riverpod/Riverpod Providers.dart';
 import 'package:qtec_task/ProductNotifier/product_notifier.dart';
+import 'model.dart';
 
-class Homepage extends ConsumerStatefulWidget {
-  const Homepage({Key? key}) : super(key: key);
+enum SortType { highToLow, lowToHigh, rating }
 
-  @override
-  ConsumerState<Homepage> createState() => _HomepageState();
-}
+final searchQueryProvider = StateProvider<String>((_) => '');
+final sortProvider = StateProvider<SortType?>((_) => null);
 
-class _HomepageState extends ConsumerState<Homepage> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(paginatedProductProvider.notifier).reset();
-    });
-  }
+class Homepage extends ConsumerWidget {
+  const Homepage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final products = ref.watch(paginatedProductProvider);
-    final notifier = ref.read(paginatedProductProvider.notifier);
-    final isLoading = ref.watch(isLoadingProvider);
-    final hasMore = ref.watch(hasMoreProvider);
-    final searchQuery = ref.watch(searchQueryProvider);
-    final sortType = ref.watch(sortTypeProvider);
-
-    // Filter & sort client-side
-    var displayed =
-        products.where((p) {
-          final title = p.title?.toLowerCase() ?? '';
-          return title.contains(searchQuery.toLowerCase());
-        }).toList();
-
-    if (sortType == SortType.highToLow) {
-      displayed.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
-    } else if (sortType == SortType.lowToHigh) {
-      displayed.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
-    } else if (sortType == SortType.rating) {
-      displayed.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
-    }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final productsAsync = ref.watch(productProvider);
+    final search = ref.watch(searchQueryProvider).toLowerCase();
+    final sort = ref.watch(sortProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.green,
-        centerTitle: true,
-        title: const Text(
-          'AL-Hamra',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-        ),
+      appBar: AppBar(title: const Text('AL-Hamra')),
+      body: productsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
+        data: (all) {
+          // 1) filter
+          var list =
+              all.where((p) {
+                return p.title?.toLowerCase().contains(search) ?? false;
+              }).toList();
+
+          // 2) sort
+          if (sort == SortType.highToLow) {
+            list.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
+          } else if (sort == SortType.lowToHigh) {
+            list.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
+          } else if (sort == SortType.rating) {
+            list.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+          }
+
+          return Column(
+            children: [
+              _buildSearchAndSortBar(ref),
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount:
+                        (MediaQuery.of(context).size.width / 180)
+                            .floor()
+                            .clamp(2, 4)
+                            .toInt(),
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 0.65,
+                  ),
+                  itemCount: list.length,
+                  itemBuilder: (ctx, i) => _ProductCard(product: list[i]),
+                ),
+              ),
+            ],
+          );
+        },
       ),
-      body: Column(
+    );
+  }
+
+  Widget _buildSearchAndSortBar(WidgetRef ref) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
         children: [
-          _buildSearchBar(),
-          if (searchQuery.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Showing ${displayed.length} result${displayed.length == 1 ? '' : 's'}',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
           Expanded(
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (scrollInfo) {
-                if (!isLoading &&
-                    hasMore &&
-                    scrollInfo.metrics.pixels >=
-                        scrollInfo.metrics.maxScrollExtent - 200) {
-                  notifier.fetchMore();
-                }
-                return false;
-              },
-              child: GridView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: hasMore ? displayed.length + 5 : displayed.length,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount:
-                      (MediaQuery.of(context).size.width / 180)
-                          .floor()
-                          .clamp(2, 4)
-                          .toInt(),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.65,
+            child: TextField(
+              onChanged:
+                  (q) => ref.read(searchQueryProvider.notifier).state = q,
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                itemBuilder: (context, index) {
-                  if (index >= displayed.length) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    );
-                  }
-
-                  final p = displayed[index];
-                  bool isFavorite = false;
-
-                  // Safely encode URL
-                  final rawUrl = p.thumbnail ?? p.images?.first ?? '';
-                  final imageUrl =
-                      rawUrl.isNotEmpty ? Uri.encodeFull(rawUrl) : '';
-
-                  return StatefulBuilder(
-                    builder: (context, setState) {
-                      return GestureDetector(
-                        onTap: () {
-                          // Navigate to detail page
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade300),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            children: [
-                              Expanded(
-                                child:
-                                    imageUrl.isEmpty
-                                        ? const Icon(
-                                          Icons.image_not_supported,
-                                          size: 48,
-                                          color: Colors.grey,
-                                        )
-                                        : Image.network(
-                                          imageUrl,
-                                          fit: BoxFit.contain,
-                                          loadingBuilder: (
-                                            context,
-                                            child,
-                                            loadingProgress,
-                                          ) {
-                                            if (loadingProgress == null)
-                                              return child;
-                                            return const Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            );
-                                          },
-                                          errorBuilder: (
-                                            context,
-                                            error,
-                                            stack,
-                                          ) {
-                                            return const Icon(
-                                              Icons.broken_image,
-                                              size: 48,
-                                              color: Colors.grey,
-                                            );
-                                          },
-                                        ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                p.title ?? '',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '\$${p.price?.toStringAsFixed(2) ?? '0.00'}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.star,
-                                    color: Colors.orange,
-                                    size: 16,
-                                  ),
-                                  Text(
-                                    '${p.rating?.toStringAsFixed(1) ?? '0.0'}',
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              if ((p.stock ?? 0) <= 0)
-                                const Text(
-                                  'Out of Stock',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
               ),
             ),
+          ),
+          const SizedBox(width: 8),
+          PopupMenuButton<SortType>(
+            icon: const Icon(Icons.sort),
+            onSelected: (s) => ref.read(sortProvider.notifier).state = s,
+            itemBuilder:
+                (_) => [
+                  const PopupMenuItem(
+                    value: SortType.highToLow,
+                    child: Text('Price ↓'),
+                  ),
+                  const PopupMenuItem(
+                    value: SortType.lowToHigh,
+                    child: Text('Price ↑'),
+                  ),
+                  const PopupMenuItem(
+                    value: SortType.rating,
+                    child: Text('Rating'),
+                  ),
+                ],
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildSearchBar() => Padding(
-    padding: const EdgeInsets.all(16.0),
-    child: Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 50,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: TextField(
-              onChanged:
-                  (q) => ref.read(searchQueryProvider.notifier).state = q,
-              decoration: const InputDecoration(
-                icon: Icon(Icons.search, color: Colors.black54),
-                hintText: 'Search...',
-                border: InputBorder.none,
-              ),
+class _ProductCard extends StatelessWidget {
+  final ProductModel product;
+  const _ProductCard({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    // Build and encode URL
+    final raw = product.thumbnail ?? '';
+    final url = raw.isNotEmpty ? Uri.encodeFull(raw) : '';
+
+    Widget imageWidget;
+    if (url.isEmpty) {
+      imageWidget = const Icon(
+        Icons.image_not_supported,
+        size: 48,
+        color: Colors.grey,
+      );
+    } else {
+      imageWidget = Image.network(
+        url,
+        fit: BoxFit.contain,
+        loadingBuilder:
+            (c, child, prog) =>
+                prog == null
+                    ? child
+                    : const Center(child: CircularProgressIndicator()),
+        errorBuilder:
+            (c, e, st) =>
+                const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+      );
+    }
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: imageWidget,
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        GestureDetector(
-          onTap: () => _showSortOptions(),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: BorderRadius.circular(12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              product.title ?? '',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            child: const Icon(Icons.sort, size: 20),
           ),
-        ),
-      ],
-    ),
-  );
-
-  void _showSortOptions() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder:
-          (_) => Column(
-            mainAxisSize: MainAxisSize.min,
+          const SizedBox(height: 4),
+          Text('\$${(product.price ?? 0).toStringAsFixed(2)}'),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ListTile(
-                title: const Text('Price - High to Low'),
-                onTap: () {
-                  ref.read(sortTypeProvider.notifier).state =
-                      SortType.highToLow;
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: const Text('Price - Low to High'),
-                onTap: () {
-                  ref.read(sortTypeProvider.notifier).state =
-                      SortType.lowToHigh;
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                title: const Text('Rating'),
-                onTap: () {
-                  ref.read(sortTypeProvider.notifier).state = SortType.rating;
-                  Navigator.pop(context);
-                },
+              const Icon(Icons.star, color: Colors.orange, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                '${(product.rating ?? 0).toStringAsFixed(1)} '
+                '(${product.stock ?? 0})',
               ),
             ],
           ),
+          if ((product.stock ?? 0) <= 0)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text('Out of Stock', style: TextStyle(color: Colors.red)),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 }
