@@ -206,8 +206,8 @@ class _ProductCardState extends State<_ProductCard> {
 
   @override
   Widget build(BuildContext context) {
-    // decode and re-encode thumbnail
-    final raw = widget.product.thumbnail ?? '';
+    final p = widget.product;
+    final raw = p.thumbnail ?? '';
     final decoded = raw.isNotEmpty ? Uri.decodeFull(raw) : '';
     final url = decoded.isNotEmpty ? Uri.encodeFull(decoded) : '';
 
@@ -234,8 +234,8 @@ class _ProductCardState extends State<_ProductCard> {
                   ),
             );
 
-    final price = widget.product.price ?? 0;
-    final disc = widget.product.discountPercentage ?? 0;
+    final price = p.price ?? 0;
+    final disc = p.discountPercentage ?? 0;
     final orig = disc > 0 ? price * 100 / (100 - disc) : price;
 
     return Stack(
@@ -252,7 +252,7 @@ class _ProductCardState extends State<_ProductCard> {
               Expanded(child: image),
               const SizedBox(height: 6),
               Text(
-                widget.product.title ?? '',
+                p.title ?? '',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.bold),
@@ -292,39 +292,22 @@ class _ProductCardState extends State<_ProductCard> {
                   const Icon(Icons.star, color: Colors.orange, size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    '${(widget.product.rating ?? 0).toStringAsFixed(1)} (${widget.product.stock ?? 0})',
+                    '${(p.rating ?? 0).toStringAsFixed(1)} (${p.stock ?? 0})',
                   ),
                 ],
               ),
-              if ((widget.product.stock ?? 0) <= 0) ...[
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Out of Stock',
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
 
-        // favorite icon (toggle locally)
+        // Favorite button
         Positioned(
           top: 6,
           right: 6,
           child: GestureDetector(
             onTap: () {
               setState(() {
-                isFav = !isFav; // toggle
+                isFav = !isFav;
               });
             },
             child: Icon(
@@ -333,6 +316,24 @@ class _ProductCardState extends State<_ProductCard> {
             ),
           ),
         ),
+
+        // Out of Stock label below favorite icon
+        if ((p.stock ?? 0) <= 0)
+          Positioned(
+            top: 36,
+            right: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                'Out of Stock',
+                style: TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+          ),
       ],
     );
   }
