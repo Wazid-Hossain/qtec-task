@@ -1,27 +1,56 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qtec_task/api%20services/api_servies.dart';
-import 'package:qtec_task/api%20services/model.dart';
+import 'package:qtec_task/api services/model.dart';
 
-/// Holds all products (100) and loading / error state.
-class ProductNotifier extends StateNotifier<AsyncValue<List<ProductModel>>> {
-  ProductNotifier() : super(const AsyncValue.loading()) {
-    _fetchAll();
+class ProductNotifier extends StateNotifier<List<ProductModel>> {
+  ProductNotifier() : super([]) {
+    fetchMore();
   }
 
-  Future<void> _fetchAll() async {
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
+  bool _hasMore = true;
+  bool get hasMore => _hasMore;
+
+  int _skip = 0;
+  static const _limit = 10;
+
+  Future<void> fetchMore() async {
+    if (_isLoading || !_hasMore) return;
+    _isLoading = true;
     try {
-      final items = await ApiService.fetchAll();
-      state = AsyncValue.data(items);
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      final newItems = await ApiService.fetchProducts(
+        limit: _limit,
+        skip: _skip,
+      );
+      if (newItems.isEmpty) {
+        _hasMore = false;
+      } else {
+        state = [...state, ...newItems];
+        _skip += _limit;
+      }
+    } finally {
+      _isLoading = false;
     }
   }
 
-  /// Pull-to-refresh or manual refresh
-  Future<void> refresh() => _fetchAll();
+  void reset() {
+    state = [];
+    _skip = 0;
+    _hasMore = true;
+    fetchMore();
+  }
 }
 
-final productProvider =
-    StateNotifierProvider<ProductNotifier, AsyncValue<List<ProductModel>>>(
+final paginatedProductProvider =
+    StateNotifierProvider<ProductNotifier, List<ProductModel>>(
       (_) => ProductNotifier(),
     );
+
+final isLoadingProvider = Provider<bool>(
+  (ref) => ref.watch(paginatedProductProvider.notifier).isLoading,
+);
+final hasMoreProvider = Provider<bool>(
+  (ref) => ref.watch(paginatedProductProvider.notifier).hasMore,
+);

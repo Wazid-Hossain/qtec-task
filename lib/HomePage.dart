@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qtec_task/ProductNotifier/product_notifier.dart';
-import 'api services/model.dart';
+import 'package:qtec_task/api services/model.dart';
+import 'package:qtec_task/riverpod/ShimmerCard.dart';
 
 enum SortType { highToLow, lowToHigh, rating }
 
@@ -10,7 +11,6 @@ final sortTypeProvider = StateProvider<SortType?>((_) => null);
 
 class Homepage extends ConsumerStatefulWidget {
   const Homepage({Key? key}) : super(key: key);
-
   @override
   ConsumerState<Homepage> createState() => _HomepageState();
 }
@@ -21,11 +21,12 @@ class _HomepageState extends ConsumerState<Homepage> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController();
-
-    // Whenever the user types, update the provider exactly once
-    _searchController.addListener(() {
-      ref.read(searchQueryProvider.notifier).state = _searchController.text;
+    _searchController =
+        TextEditingController()..addListener(() {
+          ref.read(searchQueryProvider.notifier).state = _searchController.text;
+        });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(paginatedProductProvider.notifier).reset();
     });
   }
 
@@ -37,65 +38,76 @@ class _HomepageState extends ConsumerState<Homepage> {
 
   @override
   Widget build(BuildContext context) {
-    final productsAsync = ref.watch(productProvider);
+    final items = ref.watch(paginatedProductProvider);
+    final isLoading = ref.watch(isLoadingProvider);
+    final hasMore = ref.watch(hasMoreProvider);
+
+    // client‐side filter & sort
     final query = ref.watch(searchQueryProvider).trim().toLowerCase();
     final sort = ref.watch(sortTypeProvider);
 
+    var displayed =
+        items.where((p) {
+          return p.title?.toLowerCase().contains(query) ?? false;
+        }).toList();
+
+    if (sort == SortType.highToLow) {
+      displayed.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
+    } else if (sort == SortType.lowToHigh) {
+      displayed.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
+    } else if (sort == SortType.rating) {
+      displayed.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    }
+
+    // one shimmer at the end while loading
+    final totalCount = displayed.length + (hasMore ? 1 : 0);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('AL-Hamra')),
-      body: productsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (all) {
-          // 1) filter
-          var list =
-              all.where((p) {
-                return p.title?.toLowerCase().contains(query) ?? false;
-              }).toList();
-
-          // 2) sort
-          if (sort == SortType.highToLow) {
-            list.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
-          } else if (sort == SortType.lowToHigh) {
-            list.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
-          } else if (sort == SortType.rating) {
-            list.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
-          }
-
-          return Column(
-            children: [
-              _buildSearchAndSortBar(),
-              if (query.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    'Showing ${list.length} result${list.length == 1 ? '' : 's'}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount:
-                        (MediaQuery.of(context).size.width / 180)
-                            .floor()
-                            .clamp(2, 4)
-                            .toInt(),
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.65,
-                  ),
-                  itemCount: list.length,
-                  itemBuilder: (_, i) => _ProductCard(product: list[i]),
+      appBar: AppBar(
+        title: const Text('AL-Hamra'),
+        backgroundColor: Colors.green,
+      ),
+      body: Column(
+        children: [
+          _buildSearchAndSortBar(),
+          if (query.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Showing ${displayed.length} result'
+                '${displayed.length == 1 ? '' : 's'}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            ],
-          );
-        },
+            ),
+          Expanded(
+            child: GridView.builder(
+              padding: const EdgeInsets.all(12),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount:
+                    (MediaQuery.of(context).size.width / 180)
+                        .floor()
+                        .clamp(2, 4)
+                        .toInt(),
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.65,
+              ),
+              itemCount: totalCount,
+              itemBuilder: (ctx, i) {
+                if (hasMore && i == displayed.length) {
+                  // trigger load of next page
+                  ref.read(paginatedProductProvider.notifier).fetchMore();
+                  return const ShimmerCard();
+                }
+                final p = displayed[i];
+                return _ProductCard(product: p);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -115,9 +127,7 @@ class _HomepageState extends ConsumerState<Homepage> {
                     _searchController.text.isNotEmpty
                         ? IconButton(
                           icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear(); // triggers listener
-                          },
+                          onPressed: () => _searchController.clear(),
                         )
                         : null,
                 border: OutlineInputBorder(
@@ -183,35 +193,17 @@ class _HomepageState extends ConsumerState<Homepage> {
   }
 }
 
-class _ProductCard extends StatefulWidget {
+class _ProductCard extends StatelessWidget {
   final ProductModel product;
   const _ProductCard({required this.product});
 
   @override
-  State<_ProductCard> createState() => _ProductCardState();
-}
-
-class _ProductCardState extends State<_ProductCard> {
-  bool isFav = false;
-
-  @override
   Widget build(BuildContext context) {
-    final p = widget.product;
-    final disc = p.discountPercentage ?? 0;
-    final price = p.price ?? 0;
-    final original = disc > 0 ? price * 100 / (100 - disc) : price;
+    // decode and re-encode thumbnail
+    final raw = product.thumbnail ?? '';
+    final decoded = raw.isNotEmpty ? Uri.decodeFull(raw) : '';
+    final url = decoded.isNotEmpty ? Uri.encodeFull(decoded) : '';
 
-    // 1) grab the raw thumbnail URL
-    final raw = p.thumbnail ?? '';
-
-    // 2) decode any existing % escapes, then encode once:
-    String url = '';
-    if (raw.isNotEmpty) {
-      final decoded = Uri.decodeFull(raw);
-      url = Uri.encodeFull(decoded);
-    }
-
-    // 3) build the image widget with loading and error fallback
     final image =
         url.isEmpty
             ? const Icon(
@@ -228,12 +220,16 @@ class _ProductCardState extends State<_ProductCard> {
                           ? child
                           : const Center(child: CircularProgressIndicator()),
               errorBuilder:
-                  (c, e, st) => const Icon(
+                  (c, _, __) => const Icon(
                     Icons.broken_image,
                     size: 48,
                     color: Colors.grey,
                   ),
             );
+
+    final price = product.price ?? 0;
+    final disc = product.discountPercentage ?? 0;
+    final orig = disc > 0 ? price * 100 / (100 - disc) : price;
 
     return Stack(
       children: [
@@ -249,7 +245,7 @@ class _ProductCardState extends State<_ProductCard> {
               Expanded(child: image),
               const SizedBox(height: 6),
               Text(
-                p.title ?? '',
+                product.title ?? '',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontWeight: FontWeight.bold),
@@ -268,7 +264,7 @@ class _ProductCardState extends State<_ProductCard> {
                   if (disc > 0) ...[
                     const SizedBox(width: 6),
                     Text(
-                      '\$${original.toStringAsFixed(0)}',
+                      '\$${orig.toStringAsFixed(0)}',
                       style: const TextStyle(
                         decoration: TextDecoration.lineThrough,
                         color: Colors.grey,
@@ -276,7 +272,7 @@ class _ProductCardState extends State<_ProductCard> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      '${disc.toStringAsFixed(0)}% OFF',
+                      '$disc% OFF',
                       style: const TextStyle(color: Colors.orange),
                     ),
                   ],
@@ -289,11 +285,11 @@ class _ProductCardState extends State<_ProductCard> {
                   const Icon(Icons.star, color: Colors.orange, size: 16),
                   const SizedBox(width: 4),
                   Text(
-                    '${(p.rating ?? 0).toStringAsFixed(1)} (${p.stock ?? 0})',
+                    '${(product.rating ?? 0).toStringAsFixed(1)} (${product.stock ?? 0})',
                   ),
                 ],
               ),
-              if ((p.stock ?? 0) <= 0) ...[
+              if ((product.stock ?? 0) <= 0) ...[
                 const SizedBox(height: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -314,16 +310,13 @@ class _ProductCardState extends State<_ProductCard> {
           ),
         ),
 
-        // favorite icon
+        // favorite icon (toggle locally)
         Positioned(
           top: 6,
           right: 6,
           child: GestureDetector(
-            onTap: () => setState(() => isFav = !isFav),
-            child: Icon(
-              isFav ? Icons.favorite : Icons.favorite_border,
-              color: isFav ? Colors.red : Colors.grey,
-            ),
+            onTap: () {},
+            child: const Icon(Icons.favorite_border, color: Colors.grey),
           ),
         ),
       ],
