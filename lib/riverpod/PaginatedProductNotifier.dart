@@ -1,9 +1,9 @@
 // Updated: product_notifier.dart
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qtec_task/model.dart';
-import 'package:qtec_task/product%20list/ProductRepository.dart';
-import 'package:qtec_task/product%20list/Riverpod%20Providers.dart';
+import 'package:qtec_task/api%20services/model.dart';
+import 'package:qtec_task/ProductNotifier/ProductRepository.dart';
+import 'package:qtec_task/riverpod/Riverpod%20Providers.dart';
 
 class PaginatedProductNotifier extends StateNotifier<List<ProductModel>> {
   final Ref ref;

@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qtec_task/api_servies.dart';
-import 'package:qtec_task/model.dart';
+import 'package:qtec_task/api%20services/api_servies.dart';
+import 'package:qtec_task/api%20services/model.dart';
 
 class ProductRepository {
   Future<List<ProductModel>> getProducts({int limit = 10, int skip = 0}) {
