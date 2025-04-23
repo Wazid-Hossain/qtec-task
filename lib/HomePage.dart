@@ -64,8 +64,9 @@ class _HomepageState extends ConsumerState<Homepage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AL-Hamra'),
+        title: const Text('Qtec Task'),
         backgroundColor: Colors.green,
+        centerTitle: true,
       ),
       body: Column(
         children: [
@@ -264,30 +265,40 @@ class _ProductCardState extends State<_ProductCard> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      '\$${price.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: Text(
+                        '\$${price.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (disc > 0) ...[
                       const SizedBox(width: 6),
-                      Text(
-                        '\$${orig.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                          decoration: TextDecoration.lineThrough,
-                          color: Colors.grey,
+                      Flexible(
+                        child: Text(
+                          '\$${orig.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            decoration: TextDecoration.lineThrough,
+                            color: Colors.grey,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        '$disc% OFF',
-                        style: const TextStyle(color: Colors.orange),
+                      Flexible(
+                        child: Text(
+                          '$disc% OFF',
+                          style: const TextStyle(color: Colors.orange),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ],
                 ),
+
                 const SizedBox(height: 6),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
