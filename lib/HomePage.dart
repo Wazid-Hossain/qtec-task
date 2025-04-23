@@ -86,7 +86,9 @@ class _HomepageState extends ConsumerState<Homepage> {
                               children: [
                                 Expanded(
                                   child: Image.network(
-                                    product.thumbnail ?? '',
+                                    product.thumbnail ??
+                                        product.images?.first ??
+                                        '',
                                     fit: BoxFit.contain,
                                     errorBuilder: (context, error, stackTrace) {
                                       return const Icon(
