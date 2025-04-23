@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qtec_task/ProductNotifier/product_notifier.dart';
-import 'package:qtec_task/api services/model.dart';
+import 'package:qtec_task/api_services/model.dart';
 import 'package:qtec_task/riverpod/ShimmerCard.dart';
 import 'package:qtec_task/screen/ProductDetail.dart';
 

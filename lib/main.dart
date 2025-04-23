@@ -1,27 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/painting.dart'; // for NetworkImageLoadException
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:qtec_task/HomePage.dart';
+import 'package:qtec_task/api_services/product_hive_model.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Hive
+  final dir = await getApplicationDocumentsDirectory();
+  await Hive.initFlutter(dir.path);
+
+  // Register Hive adapter
+  Hive.registerAdapter(ProductHiveModelAdapter());
+
+  // Open product cache box
+  await Hive.openBox<ProductHiveModel>('products');
+
+  // FlutterError handler for image loading / JSArray bugs
   FlutterError.onError = (FlutterErrorDetails details) {
     final exception = details.exception;
     final text = details.exceptionAsString();
 
-    // 1) genuine broken-image load   → swallow
-    // 2) DDC JSArray TypeError bug  → swallow
     if (exception is NetworkImageLoadException ||
         text.contains('NetworkImageLoadException') ||
-        // DDC bug: JSArray<dynamic> treated as wrong listener type
         (exception is TypeError && text.contains('JSArray<dynamic>')) ||
         text.contains('JDArray<dynamic>') ||
-        text.contains('is not a subtype of type \'Iterable') &&
-            text.contains('JSArray<dynamic>')) {
-      // ignore these
+        (text.contains('is not a subtype of type \'Iterable') &&
+            text.contains('JSArray<dynamic>'))) {
       return;
     }
 
-    // otherwise, fall back to default:
     FlutterError.presentError(details);
   };
 

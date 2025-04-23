@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:qtec_task/api%20services/model.dart';
+import 'package:qtec_task/api_services/model.dart';
 
 class ProductDetailPage extends StatelessWidget {
   final ProductModel product;

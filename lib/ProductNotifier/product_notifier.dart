@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qtec_task/api%20services/api_servies.dart';
-import 'package:qtec_task/api services/model.dart';
+import 'package:qtec_task/api_services/api_servies.dart';
+import 'package:qtec_task/api_services/model.dart';
 
 class ProductNotifier extends StateNotifier<List<ProductModel>> {
   ProductNotifier() : super([]) {

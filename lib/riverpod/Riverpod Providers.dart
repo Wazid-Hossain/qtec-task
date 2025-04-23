@@ -1,7 +1,7 @@
 // lib/providers/product_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qtec_task/ProductNotifier/ProductRepository.dart';
-import 'package:qtec_task/api%20services/model.dart';
+import 'package:qtec_task/api_services/model.dart';
 
 enum SortType { highToLow, lowToHigh, rating }
 
