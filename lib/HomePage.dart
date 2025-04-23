@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qtec_task/model.dart';
-import 'package:qtec_task/product%20list/Riverpod%20Providers.dart';
+import 'package:qtec_task/product list/Riverpod Providers.dart';
+import 'package:qtec_task/product%20list/product_notifier.dart';
 
-class Homepage extends ConsumerWidget {
+class Homepage extends ConsumerStatefulWidget {
   const Homepage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final productsAsync = ref.watch(productListProvider);
+  ConsumerState<Homepage> createState() => _HomepageState();
+}
+
+class _HomepageState extends ConsumerState<Homepage> {
+  @override
+  Widget build(BuildContext context) {
+    final products = ref.watch(paginatedProductProvider);
+    final notifier = ref.read(paginatedProductProvider.notifier);
     final searchQuery = ref.watch(searchQueryProvider);
-    final filteredCount = productsAsync.asData?.value.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -27,15 +33,14 @@ class Homepage extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          _buildSearchBar(context, ref),
+          _buildSearchBar(context),
 
-          /// ✨ Centered "Showing X results"
           if (searchQuery.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Center(
                 child: Text(
-                  'Showing $filteredCount result${filteredCount == 1 ? '' : 's'}',
+                  'Showing ${products.length} result${products.length == 1 ? '' : 's'}',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -45,23 +50,117 @@ class Homepage extends ConsumerWidget {
             ),
 
           Expanded(
-            child: productsAsync.when(
-              data:
-                  (products) => GridView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: products.length,
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount:
-                          (MediaQuery.of(context).size.width / 200).floor(),
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 0.65,
-                    ),
-                    itemBuilder:
-                        (_, index) => ProductCard(product: products[index]),
-                  ),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err')),
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (scrollInfo) {
+                if (scrollInfo.metrics.pixels >=
+                    scrollInfo.metrics.maxScrollExtent - 200) {
+                  notifier.fetchMore();
+                }
+                return false;
+              },
+              child: GridView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: products.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount:
+                      (MediaQuery.of(context).size.width / 200).floor(),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.65,
+                ),
+                itemBuilder: (context, index) {
+                  final product = products[index];
+                  bool isFavorite = false;
+
+                  return StatefulBuilder(
+                    builder: (context, setState) {
+                      return Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: Image.network(
+                                    product.thumbnail ?? '',
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Icon(
+                                        Icons.broken_image,
+                                        size: 48,
+                                        color: Colors.grey,
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  product.title ?? '',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "\$${product.price?.toStringAsFixed(2) ?? '0.00'}",
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.star,
+                                      color: Colors.orange,
+                                      size: 16,
+                                    ),
+                                    Text(
+                                      "${product.rating?.toStringAsFixed(1) ?? '0.0'}",
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                if ((product.stock ?? 0) <= 0)
+                                  const Text(
+                                    "Out of Stock",
+                                    style: TextStyle(
+                                      color: Colors.red,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() => isFavorite = !isFavorite);
+                              },
+                              child: Icon(
+                                isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: isFavorite ? Colors.red : Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],
@@ -69,7 +168,7 @@ class Homepage extends ConsumerWidget {
     );
   }
 
-  Widget _buildSearchBar(BuildContext context, WidgetRef ref) {
+  Widget _buildSearchBar(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Row(
@@ -83,25 +182,21 @@ class Homepage extends ConsumerWidget {
                 border: Border.all(color: Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Consumer(
-                builder: (context, ref, _) {
-                  return TextField(
-                    onChanged: (query) {
-                      ref.read(searchQueryProvider.notifier).state = query;
-                    },
-                    decoration: const InputDecoration(
-                      icon: Icon(Icons.search, color: Colors.black54),
-                      hintText: 'Search Anything...',
-                      border: InputBorder.none,
-                    ),
-                  );
+              child: TextField(
+                onChanged: (query) {
+                  ref.read(searchQueryProvider.notifier).state = query;
                 },
+                decoration: const InputDecoration(
+                  icon: Icon(Icons.search, color: Colors.black54),
+                  hintText: 'Search Anything...',
+                  border: InputBorder.none,
+                ),
               ),
             ),
           ),
           const SizedBox(width: 10),
           GestureDetector(
-            onTap: () => _showSortOptions(context, ref),
+            onTap: () => _showSortOptions(context),
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -116,7 +211,7 @@ class Homepage extends ConsumerWidget {
     );
   }
 
-  void _showSortOptions(BuildContext context, WidgetRef ref) {
+  void _showSortOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -151,82 +246,6 @@ class Homepage extends ConsumerWidget {
               ),
             ],
           ),
-    );
-  }
-}
-
-class ProductCard extends StatefulWidget {
-  final ProductModel product;
-
-  const ProductCard({super.key, required this.product});
-
-  @override
-  State<ProductCard> createState() => _ProductCardState();
-}
-
-class _ProductCardState extends State<ProductCard> {
-  bool isFavorite = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: [
-              Expanded(
-                child: Image.network(
-                  widget.product.image ?? '',
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                widget.product.title ?? '',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                "\$${widget.product.price}",
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.star, color: Colors.orange, size: 16),
-                  Text(
-                    "${widget.product.rating?.rate ?? 0} (${widget.product.rating?.count ?? 0})",
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Positioned(
-          top: 4,
-          right: 4,
-          child: GestureDetector(
-            onTap: () {
-              setState(() => isFavorite = !isFavorite);
-            },
-            child: Icon(
-              isFavorite ? Icons.favorite : Icons.favorite_border,
-              color: isFavorite ? Colors.red : Colors.grey,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

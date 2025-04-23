@@ -1,26 +1,27 @@
-// api_services.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'model.dart';
 
 class ApiService {
-  static const String _baseUrl = 'https://fakestoreapi.com/products';
+  static const String _baseUrl = 'https://dummyjson.com/products';
 
-  static Future<List<ProductModel>> fetchProducts() async {
+  static Future<List<ProductModel>> fetchProducts({
+    int limit = 10,
+    int skip = 0,
+  }) async {
     try {
-      final uri = Uri.parse(_baseUrl);
+      final uri = Uri.parse("$_baseUrl?limit=$limit&skip=$skip");
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return (data as List)
-            .map((json) => ProductModel.fromJson(json))
-            .toList();
+        final products = data['products'] as List;
+        return products.map((json) => ProductModel.fromJson(json)).toList();
       } else {
-        throw Exception('Failed to load products: ${response.statusCode}');
+        throw Exception('Failed to load products');
       }
     } catch (e) {
-      print('API Error: $e');
+      print("API Error: $e");
       rethrow;
     }
   }

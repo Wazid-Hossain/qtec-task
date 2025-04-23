@@ -10,22 +10,13 @@ class ShimmerCard extends StatelessWidget {
       baseColor: Colors.grey.shade300,
       highlightColor: Colors.grey.shade100,
       child: Container(
+        margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white,
           borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
         ),
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            Expanded(
-              child: Container(color: Colors.grey, width: double.infinity),
-            ),
-            const SizedBox(height: 6),
-            Container(height: 12, color: Colors.grey),
-            const SizedBox(height: 6),
-            Container(height: 12, width: 60, color: Colors.grey),
-          ],
-        ),
+        height: 250,
+        width: 150,
       ),
     );
   }

@@ -27,9 +27,7 @@ final productListProvider = FutureProvider<List<ProductModel>>((ref) async {
   } else if (sortType == SortType.lowToHigh) {
     filtered.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
   } else if (sortType == SortType.rating) {
-    filtered.sort(
-      (a, b) => (b.rating?.rate ?? 0).compareTo(a.rating?.rate ?? 0),
-    );
+    filtered.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
   }
 
   return filtered;
