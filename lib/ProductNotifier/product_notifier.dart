@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qtec_task/api%20services/api_servies.dart';
-import 'package:qtec_task/model.dart';
+import 'package:qtec_task/api%20services/model.dart';
 
 /// Holds all products (100) and loading / error state.
 class ProductNotifier extends StateNotifier<AsyncValue<List<ProductModel>>> {

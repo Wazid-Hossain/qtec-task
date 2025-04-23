@@ -1,32 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qtec_task/ProductNotifier/product_notifier.dart';
-import 'model.dart';
+import 'api services/model.dart';
 
 enum SortType { highToLow, lowToHigh, rating }
 
 final searchQueryProvider = StateProvider<String>((_) => '');
 final sortTypeProvider = StateProvider<SortType?>((_) => null);
 
-class Homepage extends ConsumerWidget {
-  const Homepage({super.key});
+class Homepage extends ConsumerStatefulWidget {
+  const Homepage({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<Homepage> createState() => _HomepageState();
+}
+
+class _HomepageState extends ConsumerState<Homepage> {
+  late final TextEditingController _searchController;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+
+    // Whenever the user types, update the provider exactly once
+    _searchController.addListener(() {
+      ref.read(searchQueryProvider.notifier).state = _searchController.text;
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final productsAsync = ref.watch(productProvider);
-    final search = ref.watch(searchQueryProvider).toLowerCase();
+    final query = ref.watch(searchQueryProvider).trim().toLowerCase();
     final sort = ref.watch(sortTypeProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('AL-Hamra')),
       body: productsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => Center(child: Text('Error: $e')),
+        error: (e, _) => Center(child: Text('Error: $e')),
         data: (all) {
-          // 1) filter by search
+          // 1) filter
           var list =
               all.where((p) {
-                return p.title?.toLowerCase().contains(search) ?? false;
+                return p.title?.toLowerCase().contains(query) ?? false;
               }).toList();
 
           // 2) sort
@@ -40,8 +64,8 @@ class Homepage extends ConsumerWidget {
 
           return Column(
             children: [
-              _buildSearchAndSortBar(context, ref),
-              if (search.isNotEmpty)
+              _buildSearchAndSortBar(),
+              if (query.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
@@ -66,7 +90,7 @@ class Homepage extends ConsumerWidget {
                     childAspectRatio: 0.65,
                   ),
                   itemCount: list.length,
-                  itemBuilder: (ctx, i) => _ProductCard(product: list[i]),
+                  itemBuilder: (_, i) => _ProductCard(product: list[i]),
                 ),
               ),
             ],
@@ -76,18 +100,26 @@ class Homepage extends ConsumerWidget {
     );
   }
 
-  Widget _buildSearchAndSortBar(BuildContext context, WidgetRef ref) {
+  Widget _buildSearchAndSortBar() {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Expanded(
             child: TextField(
-              onChanged:
-                  (q) => ref.read(searchQueryProvider.notifier).state = q,
+              controller: _searchController,
               decoration: InputDecoration(
-                hintText: 'Search anything...',
+                hintText: 'Search anything…',
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon:
+                    _searchController.text.isNotEmpty
+                        ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear(); // triggers listener
+                          },
+                        )
+                        : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -96,7 +128,7 @@ class Homepage extends ConsumerWidget {
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: () => _showSortSheet(context, ref),
+            onTap: _showSortSheet,
             child: Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -111,7 +143,7 @@ class Homepage extends ConsumerWidget {
     );
   }
 
-  void _showSortSheet(BuildContext context, WidgetRef ref) {
+  void _showSortSheet() {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(

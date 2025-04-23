@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:qtec_task/model.dart';
+import 'package:qtec_task/api%20services/model.dart';
 
 class ApiService {
   static const _baseUrl = 'https://dummyjson.com/products';
