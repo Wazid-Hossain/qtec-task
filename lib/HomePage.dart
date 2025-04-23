@@ -6,7 +6,7 @@ import 'model.dart';
 enum SortType { highToLow, lowToHigh, rating }
 
 final searchQueryProvider = StateProvider<String>((_) => '');
-final sortProvider = StateProvider<SortType?>((_) => null);
+final sortTypeProvider = StateProvider<SortType?>((_) => null);
 
 class Homepage extends ConsumerWidget {
   const Homepage({super.key});
@@ -15,15 +15,15 @@ class Homepage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final productsAsync = ref.watch(productProvider);
     final search = ref.watch(searchQueryProvider).toLowerCase();
-    final sort = ref.watch(sortProvider);
+    final sort = ref.watch(sortTypeProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('AL-Hamra')),
       body: productsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (e, st) => Center(child: Text('Error: $e')),
         data: (all) {
-          // 1) filter
+          // 1) filter by search
           var list =
               all.where((p) {
                 return p.title?.toLowerCase().contains(search) ?? false;
@@ -40,7 +40,18 @@ class Homepage extends ConsumerWidget {
 
           return Column(
             children: [
-              _buildSearchAndSortBar(ref),
+              _buildSearchAndSortBar(context, ref),
+              if (search.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Showing ${list.length} result${list.length == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
               Expanded(
                 child: GridView.builder(
                   padding: const EdgeInsets.all(12),
@@ -65,7 +76,7 @@ class Homepage extends ConsumerWidget {
     );
   }
 
-  Widget _buildSearchAndSortBar(WidgetRef ref) {
+  Widget _buildSearchAndSortBar(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
@@ -75,7 +86,7 @@ class Homepage extends ConsumerWidget {
               onChanged:
                   (q) => ref.read(searchQueryProvider.notifier).state = q,
               decoration: InputDecoration(
-                hintText: 'Search...',
+                hintText: 'Search anything...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -84,104 +95,206 @@ class Homepage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 8),
-          PopupMenuButton<SortType>(
-            icon: const Icon(Icons.sort),
-            onSelected: (s) => ref.read(sortProvider.notifier).state = s,
-            itemBuilder:
-                (_) => [
-                  const PopupMenuItem(
-                    value: SortType.highToLow,
-                    child: Text('Price ↓'),
-                  ),
-                  const PopupMenuItem(
-                    value: SortType.lowToHigh,
-                    child: Text('Price ↑'),
-                  ),
-                  const PopupMenuItem(
-                    value: SortType.rating,
-                    child: Text('Rating'),
-                  ),
-                ],
+          GestureDetector(
+            onTap: () => _showSortSheet(context, ref),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.sort, size: 20),
+            ),
           ),
         ],
       ),
     );
   }
+
+  void _showSortSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder:
+          (_) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Price: High → Low'),
+                onTap: () {
+                  ref.read(sortTypeProvider.notifier).state =
+                      SortType.highToLow;
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: const Text('Price: Low → High'),
+                onTap: () {
+                  ref.read(sortTypeProvider.notifier).state =
+                      SortType.lowToHigh;
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: const Text('Rating'),
+                onTap: () {
+                  ref.read(sortTypeProvider.notifier).state = SortType.rating;
+                  Navigator.pop(context);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+    );
+  }
 }
 
-class _ProductCard extends StatelessWidget {
+class _ProductCard extends StatefulWidget {
   final ProductModel product;
   const _ProductCard({required this.product});
 
   @override
-  Widget build(BuildContext context) {
-    // Build and encode URL
-    final raw = product.thumbnail ?? '';
-    final url = raw.isNotEmpty ? Uri.encodeFull(raw) : '';
+  State<_ProductCard> createState() => _ProductCardState();
+}
 
-    Widget imageWidget;
-    if (url.isEmpty) {
-      imageWidget = const Icon(
-        Icons.image_not_supported,
-        size: 48,
-        color: Colors.grey,
-      );
-    } else {
-      imageWidget = Image.network(
-        url,
-        fit: BoxFit.contain,
-        loadingBuilder:
-            (c, child, prog) =>
-                prog == null
-                    ? child
-                    : const Center(child: CircularProgressIndicator()),
-        errorBuilder:
-            (c, e, st) =>
-                const Icon(Icons.broken_image, size: 48, color: Colors.grey),
-      );
+class _ProductCardState extends State<_ProductCard> {
+  bool isFav = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.product;
+    final disc = p.discountPercentage ?? 0;
+    final price = p.price ?? 0;
+    final original = disc > 0 ? price * 100 / (100 - disc) : price;
+
+    // 1) grab the raw thumbnail URL
+    final raw = p.thumbnail ?? '';
+
+    // 2) decode any existing % escapes, then encode once:
+    String url = '';
+    if (raw.isNotEmpty) {
+      final decoded = Uri.decodeFull(raw);
+      url = Uri.encodeFull(decoded);
     }
 
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        children: [
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: imageWidget,
-            ),
+    // 3) build the image widget with loading and error fallback
+    final image =
+        url.isEmpty
+            ? const Icon(
+              Icons.image_not_supported,
+              size: 48,
+              color: Colors.grey,
+            )
+            : Image.network(
+              url,
+              fit: BoxFit.contain,
+              loadingBuilder:
+                  (c, child, prog) =>
+                      prog == null
+                          ? child
+                          : const Center(child: CircularProgressIndicator()),
+              errorBuilder:
+                  (c, e, st) => const Icon(
+                    Icons.broken_image,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
+            );
+
+    return Stack(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(12),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              product.title ?? '',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text('\$${(product.price ?? 0).toStringAsFixed(2)}'),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
             children: [
-              const Icon(Icons.star, color: Colors.orange, size: 16),
-              const SizedBox(width: 4),
+              Expanded(child: image),
+              const SizedBox(height: 6),
               Text(
-                '${(product.rating ?? 0).toStringAsFixed(1)} '
-                '(${product.stock ?? 0})',
+                p.title ?? '',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '\$${price.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (disc > 0) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      '\$${original.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        decoration: TextDecoration.lineThrough,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${disc.toStringAsFixed(0)}% OFF',
+                      style: const TextStyle(color: Colors.orange),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.star, color: Colors.orange, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${(p.rating ?? 0).toStringAsFixed(1)} (${p.stock ?? 0})',
+                  ),
+                ],
+              ),
+              if ((p.stock ?? 0) <= 0) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'Out of Stock',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
             ],
           ),
-          if ((product.stock ?? 0) <= 0)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text('Out of Stock', style: TextStyle(color: Colors.red)),
+        ),
+
+        // favorite icon
+        Positioned(
+          top: 6,
+          right: 6,
+          child: GestureDetector(
+            onTap: () => setState(() => isFav = !isFav),
+            child: Icon(
+              isFav ? Icons.favorite : Icons.favorite_border,
+              color: isFav ? Colors.red : Colors.grey,
             ),
-          const SizedBox(height: 8),
-        ],
-      ),
+          ),
+        ),
+      ],
     );
   }
 }
