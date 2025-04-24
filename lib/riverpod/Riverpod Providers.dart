@@ -1,34 +1,30 @@
-// lib/providers/product_provider.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qtec_task/ProductNotifier/ProductRepository.dart';
+import 'package:qtec_task/ProductNotifier/product_notifier.dart';
+import 'package:qtec_task/ProductNotifier/product_repository.dart';
 import 'package:qtec_task/api_services/model.dart';
+import 'package:qtec_task/riverpod/PaginatedProductNotifier.dart';
 
 enum SortType { highToLow, lowToHigh, rating }
 
-final productRepositoryProvider = Provider((ref) => ProductRepository());
+final searchQueryProvider = StateProvider<String>((_) => '');
+final sortTypeProvider = StateProvider<SortType?>((_) => null);
 
-final sortTypeProvider = StateProvider<SortType?>((ref) => null);
-final searchQueryProvider = StateProvider<String>((ref) => '');
+final productRepositoryProvider = Provider((_) => ProductRepository());
 
-final productListProvider = FutureProvider<List<ProductModel>>((ref) async {
-  final repository = ref.read(productRepositoryProvider);
-  final sortType = ref.watch(sortTypeProvider);
-  final searchQuery = ref.watch(searchQueryProvider).toLowerCase();
-  final products = await repository.fetchProducts();
+final productListProvider =
+    StateNotifierProvider<ProductNotifier, List<ProductModel>>(
+      (ref) => ProductNotifier(ref.read(productRepositoryProvider)),
+    );
 
-  final filtered =
-      products.where((product) {
-        final title = product.title?.toLowerCase() ?? '';
-        return title.contains(searchQuery);
-      }).toList();
+final paginatedProductProvider = StateNotifierProvider<
+  PaginatedProductNotifier,
+  List<ProductModel>
+>((ref) => PaginatedProductNotifier(ref, ref.read(productRepositoryProvider)));
 
-  if (sortType == SortType.highToLow) {
-    filtered.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
-  } else if (sortType == SortType.lowToHigh) {
-    filtered.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
-  } else if (sortType == SortType.rating) {
-    filtered.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
-  }
+final isLoadingProvider = Provider<bool>((ref) {
+  return ref.watch(paginatedProductProvider.notifier).isLoading;
+});
 
-  return filtered;
+final hasMoreProvider = Provider<bool>((ref) {
+  return ref.watch(paginatedProductProvider.notifier).hasMore;
 });

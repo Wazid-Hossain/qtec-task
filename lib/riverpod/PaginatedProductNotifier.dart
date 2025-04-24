@@ -1,10 +1,7 @@
-// Updated: product_notifier.dart
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:qtec_task/ProductNotifier/ProductRepository.dart';
 import 'package:qtec_task/api_services/model.dart';
-import 'package:qtec_task/riverpod/Riverpod%20Providers.dart';
+import 'package:qtec_task/ProductNotifier/product_repository.dart';
+import 'package:qtec_task/riverpod/Riverpod Providers.dart';
 
 class PaginatedProductNotifier extends StateNotifier<List<ProductModel>> {
   final Ref ref;
@@ -34,14 +31,15 @@ class PaginatedProductNotifier extends StateNotifier<List<ProductModel>> {
     _isLoading = true;
 
     try {
-      final response = await repository.fetchProducts();
-      _allProducts = response;
+      final response = await repository.fetchProducts(
+        limit: _limit,
+        skip: _page * _limit,
+      );
+      _allProducts = [..._allProducts, ...response];
       _filteredProducts = _applyFilterAndSort();
-      _page = 0;
-      _hasMore = _filteredProducts.length > _limit;
-      state = _filteredProducts.take(_limit).toList();
+      _hasMore = response.length == _limit;
+      state = _filteredProducts.take((_page + 1) * _limit).toList();
     } catch (e) {
-      // handle error appropriately
       print('Error fetching products: $e');
     } finally {
       _isLoading = false;
@@ -50,16 +48,8 @@ class PaginatedProductNotifier extends StateNotifier<List<ProductModel>> {
 
   void fetchMore() {
     if (_isLoading || !_hasMore) return;
-
-    _isLoading = true;
     _page++;
-
-    final nextItems =
-        _filteredProducts.skip(state.length).take(_limit).toList();
-    state = [...state, ...nextItems];
-    _hasMore = state.length < _filteredProducts.length;
-
-    _isLoading = false;
+    fetchProducts();
   }
 
   void _onSearchOrSortChanged() {
@@ -72,7 +62,6 @@ class PaginatedProductNotifier extends StateNotifier<List<ProductModel>> {
   List<ProductModel> _applyFilterAndSort() {
     final query = ref.read(searchQueryProvider).toLowerCase();
     final sort = ref.read(sortTypeProvider);
-
     List<ProductModel> filtered = [..._allProducts];
 
     if (query.isNotEmpty) {
@@ -82,19 +71,32 @@ class PaginatedProductNotifier extends StateNotifier<List<ProductModel>> {
               .toList();
     }
 
-    if (sort == SortType.highToLow) {
-      filtered.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
-    } else if (sort == SortType.lowToHigh) {
-      filtered.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
-    } else if (sort == SortType.rating) {
-      filtered.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    switch (sort) {
+      case SortType.highToLow:
+        filtered.sort((a, b) => (b.price ?? 0).compareTo(a.price ?? 0));
+        break;
+      case SortType.lowToHigh:
+        filtered.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
+        break;
+      case SortType.rating:
+        filtered.sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+        break;
+      default:
+        break;
     }
 
     return filtered;
   }
-}
 
-final paginatedProductProvider = StateNotifierProvider<
-  PaginatedProductNotifier,
-  List<ProductModel>
->((ref) => PaginatedProductNotifier(ref, ref.read(productRepositoryProvider)));
+  void reset() {
+    _page = 0;
+    _hasMore = true;
+    _allProducts = [];
+    _filteredProducts = [];
+    state = [];
+    fetchProducts();
+  }
+
+  bool get isLoading => _isLoading;
+  bool get hasMore => _hasMore;
+}

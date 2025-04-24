@@ -2,11 +2,14 @@ import 'dart:convert';
 
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
+import 'package:qtec_task/api_services/model.dart';
 import 'package:qtec_task/api_services/product_hive_model.dart';
-import 'model.dart'; // your existing model
 
 class ApiService {
-  static Future<List<ProductModel>> fetchProducts(int limit, int skip) async {
+  static Future<List<ProductModel>> fetchProducts({
+    required int limit,
+    required int skip,
+  }) async {
     final box = Hive.box<ProductHiveModel>('products');
 
     // Load from Hive if exists
@@ -57,7 +60,7 @@ class ApiService {
         }
       }
 
-      return products;
+      return products.cast<ProductModel>();
     } else {
       throw Exception('Failed to load products');
     }

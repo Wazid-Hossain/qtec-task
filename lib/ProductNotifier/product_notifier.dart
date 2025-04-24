@@ -1,9 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qtec_task/api_services/api_servies.dart';
 import 'package:qtec_task/api_services/model.dart';
+import 'package:qtec_task/ProductNotifier/product_repository.dart';
 
 class ProductNotifier extends StateNotifier<List<ProductModel>> {
-  ProductNotifier() : super([]) {
+  final ProductRepository _repository;
+
+  ProductNotifier(this._repository) : super([]) {
     fetchMore();
   }
 
@@ -14,22 +16,26 @@ class ProductNotifier extends StateNotifier<List<ProductModel>> {
   bool get hasMore => _hasMore;
 
   int _skip = 0;
-  static const _limit = 10;
+  static const int _limit = 10;
 
   Future<void> fetchMore() async {
     if (_isLoading || !_hasMore) return;
     _isLoading = true;
+
     try {
-      final newItems = await ApiService.fetchProducts(
+      final newItems = await _repository.fetchProducts(
         limit: _limit,
         skip: _skip,
       );
+
       if (newItems.isEmpty) {
         _hasMore = false;
       } else {
         state = [...state, ...newItems];
         _skip += _limit;
       }
+    } catch (e) {
+      print('Error fetching products: $e');
     } finally {
       _isLoading = false;
     }
@@ -42,15 +48,3 @@ class ProductNotifier extends StateNotifier<List<ProductModel>> {
     fetchMore();
   }
 }
-
-final paginatedProductProvider =
-    StateNotifierProvider<ProductNotifier, List<ProductModel>>(
-      (_) => ProductNotifier(),
-    );
-
-final isLoadingProvider = Provider<bool>(
-  (ref) => ref.watch(paginatedProductProvider.notifier).isLoading,
-);
-final hasMoreProvider = Provider<bool>(
-  (ref) => ref.watch(paginatedProductProvider.notifier).hasMore,
-);

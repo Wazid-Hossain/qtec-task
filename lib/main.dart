@@ -1,6 +1,6 @@
+import 'package:flutter/foundation.dart'; // for kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qtec_task/HomePage.dart';
@@ -9,9 +9,13 @@ import 'package:qtec_task/api_services/product_hive_model.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive
-  final dir = await getApplicationDocumentsDirectory();
-  await Hive.initFlutter(dir.path);
+  // ✅ Platform-safe Hive initialization
+  if (kIsWeb) {
+    await Hive.initFlutter();
+  } else {
+    final dir = await getApplicationDocumentsDirectory();
+    await Hive.initFlutter(dir.path);
+  }
 
   // Register Hive adapter
   Hive.registerAdapter(ProductHiveModelAdapter());
@@ -43,9 +47,6 @@ class MyApp extends StatelessWidget {
   const MyApp({super.key});
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: const Homepage(),
-    );
+    return MaterialApp(debugShowCheckedModeBanner: false, home: Homepage());
   }
 }
