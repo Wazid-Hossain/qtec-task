@@ -30,23 +30,35 @@ A modern Flutter shopping app that displays products using the [DummyJSON API](h
 ## 📸 Screenshots
 ### 🏠 Homepage
 ![Homepage](screenshots/HomePage.png)
-- This is the responsive homepage
+
+- This is the responsive homepage for Web
+
+- 
 ![Homepage](screenshots/Responsive_for_Web.png)
 
 
 
 ### 🔍 Search and Sort
 - - Search filtering with instant updates When user type something in search bar like 'm' it's show all the product contains 'm'
+  - 
 ![Search Filtering](screenshots/Search_filtering_with_instant_updates.png)
-- When user tapped the manu icon it's Show sort Option
-![Sort by Options](screenshots/Sort_by.png)
-- When user select High to Low
-![Sort High to Low](screenshots/Sort_By_Hight_to_Low.png)
-- When user select Rateing
-![Sort by Rating](screenshots/Sort_by_Rateing.png)
 
+- When user tapped the manu icon it's Show sort Option
+  
+![Sort by Options](screenshots/Sort_by.png)
+- 
+- When user select High to Low
+- 
+- 
+![Sort High to Low](screenshots/Sort_By_Hight_to_Low.png)
+- 
+- When user select Rateing
+- 
+![Sort by Rating](screenshots/Sort_by_Rateing.png)
+- 
 ### 📄 Product Detail
 - When user tapped a spacific product card then it's show the full product Details
+- 
 ![Product Detail](screenshots/Product_Details.png)
 
 
